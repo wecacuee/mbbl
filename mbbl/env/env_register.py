@@ -10,6 +10,10 @@ import importlib
 _ENV_INFO = {}
 
 _ENV_INFO.update({
+    'gym_pusher': {
+        'path': 'mbbl.env.gym_env.pusher',
+        'ob_size': 19, 'action_size': 2, 'max_length': 50,
+    },
     'gym_reacher': {
         'path': 'mbbl.env.gym_env.reacher',
         'ob_size': 11, 'action_size': 2, 'max_length': 50,

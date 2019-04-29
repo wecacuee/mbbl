@@ -80,7 +80,7 @@ We implemented and benchmarked the environments in this repo [PILCO](https://git
 ### 5. Iterative Linear Quadratic-Gaussian (iLQG) ![#22d50c](https://placehold.it/15/22d50c/000000?text=+)
 Tassa, Y., Erez, T., & Todorov, E. (2012, October). Synthesis and stabilization of complex behaviors through online trajectory optimization. In 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems (pp. 4906-4913). IEEE. [Link](https://homes.cs.washington.edu/~todorov/papers/TassaIROS12.pdf)
 ```
-python main/ilqr_main.py  --exp_id ilqr-gym_cheetah \ 
+python main/ilqr_main.py  --exp_id ilqr-gym_cheetah \
     --max_timesteps 2000 --task gym_cheetah \
     --timesteps_per_batch 1 --ilqr_iteration 10 --ilqr_depth 30 \
     --max_ilqr_linesearch_backtrack 10  --num_workers 2 \

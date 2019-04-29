@@ -14,6 +14,14 @@ setuptools.setup(
                        './env/gym_env/pets_env/assets/*.xml']},
     include_package_data=True,
     install_requires=[
+        "pyquaternion",
+        "beautifulsoup4",
+        "Box2D>=2.3.2",
+        "num2words",
+        "six",
+        "tensorboard_logger",
+        "tensorflow==1.12.0",
+        "termcolor",
     ],
 )
 
