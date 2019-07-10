@@ -1,0 +1,22 @@
+<mujoco>
+        <geom conaffinity="0" contype="0" fromto="0 0 0 0 0 0.02" name="root" rgba="0.9 0.4 0.6 1" size=".011" type="cylinder"/>
+        <body name="body0" pos="0 0 .01">
+          <geom conaffinity="0" contype="0" fromto="0 0 0 0.1 0 0" name="link0" rgba="0.0 0.4 0.6 1" size=".01" type="capsule"/>
+          <joint axis="0 0 1" limited="false" name="joint0" pos="0 0 0" type="hinge"/>
+          <body name="body1" pos="0.1 0 0">
+            <joint axis="0 0 1" limited="true" name="joint1" pos="0 0 0" range="-3.0 3.0" type="hinge"/>
+            <geom conaffinity="1" contype="1" fromto="0 0 0 0.1 0 0" name="link1" rgba="0.0 0.4 0.6 1" size=".01" type="capsule"/>
+            <body name="link2" pos="0.1 0 0">
+              <joint axis="0 0 1" limited="true" name="joint2" pos="0 0 0" range="-3.0 3.0" type="hinge"/>
+              <geom conaffinity="1" contype="1" fromto="0 0 0 0.1 0 0" name="link2" rgba="0.6 0.4 0.0 1" size=".01" type="capsule"/>
+              <body name="forearm" pos="0.11 0 0">
+                <joint axis="0 0 1" limited="true" name="joint3" pos="0 0 0" range="-3.0 3.0" type="hinge"/>
+                <geom conaffinity="1" contype="1" type="mesh" mesh="forearm"/>
+                <body name="fingertip" pos=".09 0 0">
+                  <geom type="sphere" name="fingertip" pos="0 0 0" rgba="0.2 0.9 0.2 1" size="0.009" />
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+</mujoco>
