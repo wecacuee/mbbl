@@ -12,7 +12,7 @@ _ENV_INFO = {}
 _ENV_INFO.update({
     'gym_pusher': {
         'path': 'mbbl.env.gym_env.pusher',
-        'ob_size': 15, 'action_size': 2, 'max_length': 50,
+        'ob_size': 18, 'action_size': 2, 'max_length': 50,
     },
     'gym_reacher': {
         'path': 'mbbl.env.gym_env.reacher',

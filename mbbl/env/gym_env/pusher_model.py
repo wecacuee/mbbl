@@ -66,6 +66,7 @@ class StateEncoder(Encoder):
         self.part_lengths = [len(env.qpos_indices),
                              len(env.qpos_indices),
                              len(env.dof_indices),
+                             3,
                              3]
 
     def _fromparts(self, parts):
@@ -78,18 +79,19 @@ class StateEncoder(Encoder):
                  for s, e in zip(breakpoints[:-1], breakpoints[1:])]
         return parts
 
-    def encode(self, theta, qvel, goal_vec):
+    def encode(self, theta, qvel, finger_vec, goal_vec):
         return self._fromparts([
             np.cos(theta),
             np.sin(theta),
             qvel,
+            finger_vec,
             goal_vec
         ])
 
     def decode(self, state):
-        cos_thetas, sin_thetas, qvel, goal_vec = self._toparts(state)
+        cos_thetas, sin_thetas, qvel, finger_vec, goal_vec = self._toparts(state)
         thetas = np.arctan2(cos_thetas, sin_thetas)
-        return thetas, qvel, goal_vec
+        return thetas, qvel, finger_vec, goal_vec
 
 
 # Copied from gym.envs.mujoco.reacher.py
@@ -190,11 +192,12 @@ class PusherEnv(utils.EzPickle, MujocoEnv):
     def _get_obs(self):
         theta = self.data.qpos.reshape(-1)[self.qpos_indices]
         qvel = self.data.qvel.reshape(-1)[self.dof_indices]
-        goal_vec = self.get_body_com("fingertip") - self.get_body_com("target")
-        return self.obs_encoder.encode(theta, qvel, goal_vec)
+        finger_vec = self.get_body_com("fingertip") - self.get_body_com("object")
+        goal_vec = self.get_body_com("object") - self.get_body_com("target")
+        return self.obs_encoder.encode(theta, qvel, finger_vec, goal_vec)
 
     def obs2state(self, obs):
-        theta, qvel_decoded, goal_vec = self.obs_encoder.decode(obs)
+        theta, qvel_decoded, finger_vec, goal_vec = self.obs_encoder.decode(obs)
         qpos = np.zeros_like(self.data.qpos).ravel()
         qvel = np.zeros_like(self.data.qvel).ravel()
         qpos[self.qpos_indices] = theta

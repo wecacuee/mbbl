@@ -8,7 +8,10 @@
 #       3. an episode has fixed length.
 #       4. provide ground-truth dynamics
 # -----------------------------------------------------------------------------
-import numpy as np
+from itertools import combinations
+
+import autograd.numpy as np
+from autograd import elementwise_grad as egrad, grad, jacobian
 
 from mbbl.config import init_path
 from mbbl.env import base_env_wrapper
@@ -16,6 +19,7 @@ from mbbl.env import env_register
 from mbbl.env import env_util
 
 from mbbl.env.gym_env.pusher_model import PusherEnv
+import tensorflow as tf
 
 
 class env(base_env_wrapper.base_env):
@@ -136,19 +140,75 @@ class env(base_env_wrapper.base_env):
         # step 1, set the zero-order reward function
         assert self._env_name in self.ARM_2D
 
-        def reward(data_dict):
+        state = tf.placeholder(tf.float32, shape=(self._env_info['ob_size'],))
+        action = tf.placeholder(tf.float32, shape=(self._env_info['action_size'],))
+        def _tf_reward_g(state, action):
+            dist_vec = state[-6:]
+            reward_dist = - tf.linalg.norm(dist_vec)
+            reward_ctrl = - tf.reduce_sum(tf.square(action))
+            return reward_dist + reward_ctrl
+        tf_reward_g = _tf_reward_g(state, action)
+
+        def tf_reward(data_dict):
+            return session.run(tf_reward_g,
+                               feed_dict={
+                                   state: data_dict['start_state'],
+                                   action: data_dict['action']})
+
+        def reward_np(dist_vec, action):
             """ @brief: Return the reward for given state
 
             @input:
                 data_dict: A dictionary with keys
                     start_state: State vector in cos-sin for controller
             """
-            dist_vec = data_dict['start_state'][-3:]
-            reward_dist = - np.linalg.norm(dist_vec)
-            reward_ctrl = - np.square(data_dict['action']).sum()
+            reward_dist = - np.linalg.norm(dist_vec, axis=-1)
+            reward_ctrl = - np.square(action).sum(axis=-1)
 
             return reward_dist + reward_ctrl
+
+        def reward(data_dict):
+            return reward_np(data_dict['start_state'][-6:], data_dict['action'])
+
         self.reward = reward
+        # self.reward = tf_reward
+
+        def tf_reward_derivative(data_dict, target):
+            num_data = len(data_dict['start_state'])
+            rew_x_graph = tf.gradients([tf_reward_g], [state])
+            rew_u_graph = tf.gradients([tf_reward_g], [action])
+            feed_dict = {state: data_dict['start_state'],
+                         action: data_dict['action']}
+            if target == 'state':
+                derivative_data = session.run(rew_grad_graph,
+                                              feed_dict=feed_dict)
+            elif target == 'action':
+                derivative_data = session.run(rew_u_graph,
+                                              feed_dict=feed_dict)
+            elif target == 'state-state':
+                rew_xx_graph = tf.gradients([rew_x_graph],
+                                            [state])
+                derivative_data = session.run(rew_xx_graph,
+                                              feed_dict=feed_dict)
+            elif target == 'action-action':
+                rew_uu_graph = tf.gradients([rew_u_graph],
+                                            [action])
+                derivative_data = session.run(rew_uu_graph,
+                                              feed_dict=feed_dict)
+            elif target == 'action-state':
+                rew_ux_graph = tf.gradients([rew_u_graph],
+                                            [state])
+                derivative_data = session.run(rew_ux_graph,
+                                              feed_dict=feed_dict)
+            elif target == 'state-action':
+                rew_xu_graph = tf.gradients([rew_x_graph],
+                                            [action])
+                derivative_data = session.run(rew_xu_graph,
+                                              feed_dict=feed_dict)
+            else:
+                raise NotImplementedError("Invalid target %s" % target)
+            return derivative_data
+
 
         def reward_derivative(data_dict, target):
             """ @brief: Return the reward derivative
@@ -162,41 +222,48 @@ class env(base_env_wrapper.base_env):
                       action-state
             """
             num_data = len(data_dict['start_state'])
+            state = data_dict['start_state']
+            dist_vec = state[:, -6:]
+            ssize = dist_vec.shape[1]
+            action = data_dict['action']
             if target == 'state':
                 # reward - \sqrt(x^2 + y^2 + z^2)
                 derivative_data = np.zeros(
                     [num_data, self._env_info['ob_size']], dtype=np.float
                 )
-                norm = np.linalg.norm(data_dict['start_state'][:, -3:],
+                norm = np.linalg.norm(data_dict['start_state'][:, -6:],
                                       axis=1, keepdims=True)
-                derivative_data[:, -3:] = \
-                    - data_dict['start_state'][:, -3:] / norm
+                derivative_data[:, -6:] = \
+                    - data_dict['start_state'][:, -6:] / norm
 
+                derivative_data_ag = egrad(reward_np, argnum=0)(dist_vec, action)
+                assert np.allclose(derivative_data[:, -6:], derivative_data_ag)
             elif target == 'action':
                 derivative_data = np.zeros(
                     [num_data, self._env_info['action_size']], dtype=np.float
                 )
                 derivative_data[:, :] = - 2.0 * 1.0 * data_dict['action'][:, :]
-
+                derivative_data_ag = egrad(reward_np, argnum=1)(dist_vec, action)
+                assert np.allclose(derivative_data, derivative_data_ag)
             elif target == 'state-state':
                 derivative_data = np.zeros(
                     [num_data,
                      self._env_info['ob_size'], self._env_info['ob_size']],
                     dtype=np.float
                 )
-                norm = np.linalg.norm(data_dict['start_state'][:, -3:],
+                norm = np.linalg.norm(data_dict['start_state'][:, -6:],
                                       axis=1, keepdims=True)
                 norm3 = np.reshape(np.power(norm, 3), [-1])
 
                 # the diagonal term
-                for i in [-3, -2, -1]:
+                for i in range(-6, 0):
                     derivative_data[:, i, i] = np.reshape(
                         - 1.0 / norm.reshape([-1]) +
                         np.square(data_dict['start_state'][:, i]) / norm3,
                         [-1]
                     )
                 # the off diagonal term
-                for x, y in [[-3, -2], [-3, -1], [-2, -1]]:
+                for x, y in combinations(range(-6, 0), 2):
                     derivative_data[:, x, y] = \
                         data_dict['start_state'][:, x] * \
                         data_dict['start_state'][:, y] / \
@@ -212,14 +279,12 @@ class env(base_env_wrapper.base_env):
 
                 for diagonal_id in range(self._env_info['action_size']):
                     derivative_data[:, diagonal_id, diagonal_id] += -2.0
-
             elif target == 'state-action':
                 derivative_data = np.zeros(
                     [num_data, self._env_info['ob_size'],
                      self._env_info['action_size']],
                     dtype=np.float
                 )
-
             elif target == 'action-state':
                 derivative_data = np.zeros(
                     [num_data, self._env_info['action_size'],
@@ -233,6 +298,7 @@ class env(base_env_wrapper.base_env):
             return derivative_data
 
         self.reward_derivative = reward_derivative
+        # self.reward_derivative = tf_reward_derivative
 
 
 if __name__ == '__main__':
